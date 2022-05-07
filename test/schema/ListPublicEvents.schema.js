@@ -29,7 +29,26 @@ const listPublicEventsSchema = {
         type: 'string'
       },
       type: {
-        type: 'string'
+        type: 'string',
+        enum: [
+          'CommitCommentEvent',
+          'CreateEvent',
+          'DeleteEvent',
+          'ForkEvent',
+          'GollumEvent',
+          'IssueCommentEvent',
+          'IssuesEvent',
+          'MemberEvent',
+          'PublicEvent',
+          'PullRequestEvent',
+          'PullRequestReviewEvent',
+          'PullRequestReviewCommentEvent',
+          'PullRequestReviewThreadEvent',
+          'PushEvent',
+          'ReleaseEvent',
+          'SponsorshipEvent',
+          'WatchEvent'
+        ]
       },
       actor: userSchema,
       repo: {
