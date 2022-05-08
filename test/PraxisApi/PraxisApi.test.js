@@ -79,6 +79,13 @@ describe('Praxis Api', () => {
       expect(body).to.be.jsonSchema(itemPraxisSchema);
       expect(body).to.deep.equal(testItem);
     });
+
+    it('should give NOT FOUND error when looking for a non existing item', async () => {
+      const nonExistingItemId = Math.max(...itemsInDB.map((item) => item.id)) + 1;
+      const { body, status } = await agent.get(`${baseUrl}/items/${nonExistingItemId}`).ok(() => true);
+      expect(status).to.equal(statusCode.NOT_FOUND);
+      expect(body).to.contains({ error: 'Not Found' });
+    });
   });
 
   describe('create elements with POST services', async () => {
@@ -97,6 +104,13 @@ describe('Praxis Api', () => {
       expect(status).to.equal(statusCode.CREATED);
       expect(body).to.be.jsonSchema(listOfItemsSchema);
       expect(body.map(({ id, ...it }) => it)).to.deep.equals(listOfItems);
+    });
+    it('should avoid creation of a non item object', async () => {
+      const messageRegex = /There is an issue with the field (\w+), \1 is mandatory/;
+      const testItem = { name: 'non item' };
+      const { body, status } = await agent.post(`${baseUrl}/items`).send(testItem).ok(() => true);
+      expect(status).to.equal(statusCode.BAD_REQUEST);
+      expect(body.message).to.match(messageRegex);
     });
   });
 
@@ -120,6 +134,12 @@ describe('Praxis Api', () => {
       expect(updatedItem).to.be.jsonSchema(itemPraxisSchema);
       expect(updatedItem).to.deep.equal(testItem);
     });
+    it('should avoid modification of a non existing object', async () => {
+      const testItem = { name: 'non item' };
+      const { body, status } = await agent.put(`${baseUrl}/items/${itemInDB + 1}`).send(testItem).ok(() => true);
+      expect(status).to.equal(statusCode.BAD_REQUEST);
+      expect(body).to.deep.equals({});
+    });
   });
 
   describe('delete elements with DELETE services', async () => {
@@ -133,6 +153,12 @@ describe('Praxis Api', () => {
       const { body: { length: itemsAmmount }, status } = await agent.get(`${baseUrl}/items`);
       expect(status).to.equal(statusCode.OK);
       expect(itemsAmmount).to.equal(0);
+    });
+    it('should give NOT FOUND error when trying to delete a non existing item', async () => {
+      const nonExistingItemId = Math.max(...itemsInDB.map((item) => item.id)) + 1;
+      const { body, status } = await agent.delete(`${baseUrl}/items/${nonExistingItemId}`).ok(() => true);
+      expect(status).to.equal(statusCode.NOT_FOUND);
+      expect(body).to.contains({ error: 'Not Found' });
     });
   });
 
