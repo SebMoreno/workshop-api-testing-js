@@ -1,6 +1,6 @@
 const agent = require('superagent');
 const chai = require('chai');
-const { listPublicEventsSchema } = require('./schema/ListPublicEvents.schema');
+const { listPublicEventsSchema } = require('../schema/ListPublicEvents.schema');
 
 const { expect } = chai;
 chai.use(require('chai-json-schema'));

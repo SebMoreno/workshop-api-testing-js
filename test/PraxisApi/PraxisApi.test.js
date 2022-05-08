@@ -5,8 +5,8 @@ chai.use(require('chai-json-schema'));
 
 const { expect } = chai;
 
-const { resetDB, deleteItemsFromDB } = require('./util/utils');
-const { itemPraxisSchema } = require('./schema/ItemPraxis.schema');
+const { resetDB, deleteItemsFromDB } = require('../util/utils');
+const { itemPraxisSchema } = require('../schema/ItemPraxis.schema');
 
 const listOfItemsSchema = {
   title: 'List of items schema',
