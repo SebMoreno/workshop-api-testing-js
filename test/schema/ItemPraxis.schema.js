@@ -16,7 +16,7 @@ const itemPraxisSchema = {
     },
     type: {
       type: 'string',
-      enum: ['AGED', 'NORMAL', 'TICKET', 'LEGENDARY']
+      enum: ['AGED', 'NORMAL', 'TICKETS', 'LEGENDARY']
     }
   }
 };

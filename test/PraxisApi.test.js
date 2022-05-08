@@ -1,74 +1,151 @@
 const agent = require('superagent');
 const statusCode = require('http-status-codes');
 const chai = require('chai');
-const { itemPraxisSchema } = require('./schema/ItemPraxis.schema');
-
-const { expect } = chai;
 chai.use(require('chai-json-schema'));
 
-const baseUrl = process.env.PRAXIS_API_URL;
+const { expect } = chai;
+
+const { resetDB, deleteItemsFromDB } = require('./util/utils');
+const { itemPraxisSchema } = require('./schema/ItemPraxis.schema');
+
+const listOfItemsSchema = {
+  title: 'List of items schema',
+  type: 'array',
+  items: itemPraxisSchema
+};
+
+const baseUrl = process.env.PRAXIS_API_URL || 'http://localhost:8080/api';
+
+const listOfItems = [
+  {
+    name: 'Chocolate',
+    sellIn: 0,
+    quality: 80,
+    type: 'LEGENDARY'
+  },
+  {
+    name: 'salsa',
+    sellIn: 42,
+    quality: 23,
+    type: 'NORMAL'
+  },
+  {
+    name: 'Rosalia',
+    sellIn: 5,
+    quality: 10,
+    type: 'TICKETS'
+  }
+];
+const listOfItemsWithQualityUpdated = [
+  {
+    name: 'Chocolate',
+    quality: 80,
+    sellIn: 0,
+    type: 'LEGENDARY'
+  },
+  {
+    name: 'salsa',
+    quality: 22,
+    sellIn: 41,
+    type: 'NORMAL'
+  },
+  {
+    name: 'Rosalia',
+    quality: 13,
+    sellIn: 4,
+    type: 'TICKETS'
+  }
+];
 
 describe('Praxis Api', () => {
-  it('consume GET service', async () => {
-    const response = await agent.get(`${baseUrl}/items`);
-    expect(response.status).to.equal(statusCode.OK);
-    expect(response.body).to.be.jsonSchema({
-      title: 'List of items schema',
-      type: 'array',
-      items: itemPraxisSchema
+  describe('services for GET elements', async () => {
+    let itemsInDB;
+    beforeEach(async () => {
+      await resetDB(baseUrl);
+      itemsInDB = (await agent.post(`${baseUrl}/items/batch`).send(listOfItems)).body;
+    });
+
+    it('should return a list of items', async () => {
+      const { body, status } = await agent.get(`${baseUrl}/items`);
+      expect(status).to.equal(statusCode.OK);
+      expect(body).to.be.jsonSchema(listOfItemsSchema);
+      expect(body).to.deep.equal(itemsInDB);
+    });
+
+    it('should return the requested item', async () => {
+      const testItem = itemsInDB[0];
+      const { body, status } = await agent.get(`${baseUrl}/items/${testItem.id}`);
+      expect(status).to.equal(statusCode.OK);
+      expect(body).to.be.jsonSchema(itemPraxisSchema);
+      expect(body).to.deep.equal(testItem);
     });
   });
 
-  it.only('test', async () => {
-    const { body } = await agent.get(`${baseUrl}/items`);
-    console.log(1);
-    body.forEach(async (item, i) => {
-      await agent.delete(`${baseUrl}/items/${item.id}`);
-      console.log(`1.${i}`);
+  describe('create elements with POST services', async () => {
+    beforeEach(async () => {
+      await deleteItemsFromDB(baseUrl, listOfItems);
     });
-    console.log(2);
-    const resp = await agent.get(`${baseUrl}/items`);
-    console.log(3);
-    expect(resp.body.length).to.equal(0);
+    it('with a single object', async () => {
+      const testItem = listOfItems[0];
+      const { body, status } = await agent.post(`${baseUrl}/items`).send(testItem);
+      expect(status).to.equal(statusCode.CREATED);
+      expect(body).to.be.jsonSchema(itemPraxisSchema);
+      expect(body).to.contains(testItem);
+    });
+    it('with a list of items', async () => {
+      const { body, status } = await agent.post(`${baseUrl}/items/batch`).send(listOfItems);
+      expect(status).to.equal(statusCode.CREATED);
+      expect(body).to.be.jsonSchema(listOfItemsSchema);
+      expect(body.map(({ id, ...it }) => it)).to.deep.equals(listOfItems);
+    });
   });
-  it('should ', async () => {
-    await agent.post(`${baseUrl}/items/batch`).send([{
-      name: 'Chocolate',
-      sellIn: 200,
-      quality: 80,
-      type: 'LEGENDARY'
-    },
-    {
-      name: 'salsa',
-      sellIn: 200,
-      quality: 80,
+
+  describe('update elements with PUT services', async () => {
+    let itemInDB = {
+      name: 'Celular',
+      sellIn: 15,
+      quality: 30,
       type: 'NORMAL'
-    },
-    {
-      name: 'Rosalia',
-      sellIn: 200,
-      quality: 10,
-      type: 'TICKETS'
-    }]);
+    };
+    beforeEach(async () => {
+      await resetDB(baseUrl);
+      itemInDB = (await agent.post(`${baseUrl}/items`).send(itemInDB)).body;
+    });
+
+    it('should update the requested item', async () => {
+      const testItem = { ...itemInDB, quality: 40 };
+      const { body: updatedItem, status } = await agent.put(`${baseUrl}/items/${testItem.id}`)
+        .send(testItem);
+      expect(status).to.equal(statusCode.OK);
+      expect(updatedItem).to.be.jsonSchema(itemPraxisSchema);
+      expect(updatedItem).to.deep.equal(testItem);
+    });
+  });
+
+  describe('delete elements with DELETE services', async () => {
+    let itemsInDB;
+    beforeEach(async () => {
+      await resetDB(baseUrl);
+      itemsInDB = (await agent.post(`${baseUrl}/items/batch`).send(listOfItems)).body;
+    });
+    it('should have deleted all elements in DB', async () => {
+      await Promise.all(itemsInDB.map((item) => agent.delete(`${baseUrl}/items/${item.id}`)));
+      const { body: { length: itemsAmmount }, status } = await agent.get(`${baseUrl}/items`);
+      expect(status).to.equal(statusCode.OK);
+      expect(itemsAmmount).to.equal(0);
+    });
+  });
+
+  describe('update quality of the items with the POST service', async () => {
+    beforeEach(async () => {
+      await resetDB(baseUrl);
+      await agent.post(`${baseUrl}/items/batch`).send(listOfItems);
+    });
+    it('should update the quality of all items properly', async () => {
+      const { body: updatedItems, status } = await agent.post(`${baseUrl}/items/quality`);
+      expect(status).to.equal(statusCode.OK);
+      expect(updatedItems).to.be.jsonSchema(listOfItemsSchema);
+      expect(updatedItems.map(({ id, ...it }) => it)).to.deep.equals(listOfItemsWithQualityUpdated);
+    });
   });
 });
-
-/*
-const { body: items } = await agent.get(`${baseUrl}/items`);
-await Promise.all(items.map((item) => agent.delete(`${baseUrl}/items/${item.id}`)));
-const { body: { length: itemsAmmount } } = await agent.get(`${baseUrl}/items`);
-expect(itemsAmmount).to.equal(0);
-
-const { body: items } = await agent.get(`${baseUrl}/items`);
-// await Promise.all(items.map((item) => agent.delete(`${baseUrl}/items/${item.id}`)));
-console.log(1);
-items.forEach(async (item, i) => {
-  await agent.delete(`${baseUrl}/items/${item.id}`);
-  console.log('1.' + i);
-});
-console.log(2);
-const { body: { length: itemsAmmount } } = await agent.get(`${baseUrl}/items`);
-console.log(3);
-await agent.get(`${baseUrl}/items`);
-expect(itemsAmmount).to.equal(0);
-*/
